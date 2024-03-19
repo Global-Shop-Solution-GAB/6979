@@ -1,0 +1,915 @@
+﻿Program.Sub.ScreenSU.Start
+Gui.EmpEval..Create(BaseForm)
+Gui.EmpEval..Caption("Form")
+Gui.EmpEval..Size(1554,751)
+Gui.EmpEval..MinX(0)
+Gui.EmpEval..MinY(0)
+Gui.EmpEval..Position(0,0)
+Gui.EmpEval..AlwaysOnTop(False)
+Gui.EmpEval..FontName("Tahoma")
+Gui.EmpEval..FontSize(8.25)
+Gui.EmpEval..ControlBox(True)
+Gui.EmpEval..MaxButton(True)
+Gui.EmpEval..MinButton(True)
+Gui.EmpEval..MousePointer(0)
+Gui.EmpEval..Moveable(True)
+Gui.EmpEval..Sizeable(True)
+Gui.EmpEval..ShowInTaskBar(True)
+Gui.EmpEval..TitleBar(True)
+Gui.EmpEval..Event(UnLoad,EmpEval_UnLoad)
+Gui.EmpEval.GSGC_EmpEval.Create(GsGridControl)
+Gui.EmpEval.GSGC_EmpEval.Enabled(True)
+Gui.EmpEval.GSGC_EmpEval.Visible(True)
+Gui.EmpEval.GSGC_EmpEval.Zorder(0)
+Gui.EmpEval.GSGC_EmpEval.Size(1546,636)
+Gui.EmpEval.GSGC_EmpEval.Position(4,78)
+Gui.EmpEval.GSGC_EmpEval.Anchor(15)
+Gui.EmpEval.picGSSLogo.Create(PictureBox)
+Gui.EmpEval.picGSSLogo.Enabled(True)
+Gui.EmpEval.picGSSLogo.Visible(True)
+Gui.EmpEval.picGSSLogo.Zorder(0)
+Gui.EmpEval.picGSSLogo.Size(275,64)
+Gui.EmpEval.picGSSLogo.Position(657,4)
+Gui.EmpEval.picGSSLogo.Anchor(1)
+Gui.EmpEval.ddlStatus.Create(DropDownList)
+Gui.EmpEval.ddlStatus.Enabled(True)
+Gui.EmpEval.ddlStatus.Visible(True)
+Gui.EmpEval.ddlStatus.Zorder(0)
+Gui.EmpEval.ddlStatus.Size(100,20)
+Gui.EmpEval.ddlStatus.Position(97,39)
+Gui.EmpEval.ddlStatus.FontName("Tahoma")
+Gui.EmpEval.ddlStatus.FontSize(8.25)
+Gui.EmpEval.ddlStatus.Event(Change,ddlStatus_Change)
+Gui.EmpEval.lbl1.Create(Label,"Employee Status:",True,84,13,0,7,43,True,0,"Tahoma",8.25,,0,0)
+Gui.EmpEval.lbl1.BorderStyle(0)
+Gui.EmpEval.lblCacheTime.Create(Label,"Label",True,25,13,0,7,12,True,0,"Tahoma",8.25,,0,0)
+Gui.EmpEval.lblCacheTime.BorderStyle(0)
+Program.Sub.ScreenSU.End
+
+Program.Sub.Preflight.Start
+V.Global.sMonthOrder.Declare(String)
+V.Global.sCondition.Declare(String)
+V.GLobal.iBIRUNID.Declare
+V.Global.BILOGID.Declare(Long)
+Program.Sub.Preflight.End
+
+Program.Sub.Main.Start
+'Developer: Angel Tudon
+'Customer: NEP Electronics Inc
+'Ticket: https://www.gss-service.com/Calls/CallEditInternalOpen/1341807
+'Quote: 13821 - 0
+'This project will generate the main Employee Evaluation dashboard for ARC 6979. Dashboard will only load or contain data once the cache data portion of this project has been ran overnight via a scheduled task connected to script GCG_6979_CACHE_DATA
+F.Intrinsic.Control.Try
+
+V.Local.sIcon.Declare(String)
+V.Local.sGssLogo.Declare(String)
+Function.Intrinsic.UI.UsePixels ' Allows you to use Pixels instead of Twips throughout
+F.ODBC.Connection!con.OpenCompanyConnection(400)
+
+'Set GS Logo
+F.Intrinsic.String.Build("{0}\ART\gss2.ico",V.Caller.GlobalDir,v.Local.sIcon)		
+F.Intrinsic.String.Build("{0}\ART\GAB_GSS_Logo_Green_Dash.png",V.Caller.GlobalDir,V.Local.sGssLogo)
+Gui.EmpEval..Icon(v.Local.sIcon)
+Gui.EmpEval.picGSSLogo.Picture(v.Local.sGsslogo)
+
+'Populate employee status drop down list and set default condition to load all employees
+GUI.EmpEval.ddlStatus.AddItem("All")
+GUI.EmpEval.ddlStatus.AddItem("Active")
+GUI.EmpEval.ddlStatus.AddItem("Inactive")
+F.Intrinsic.Control.BlockEvents
+GUI.EmpEval.ddlStatus.Text("All")
+'V.Global.sCondition.Set("where EMPL not like '#%' and EMPLOYEE not like '*%'")
+F.Intrinsic.Control.UnBlockEvents
+
+F.Intrinsic.Control.CallSub(LoadData)
+F.Intrinsic.Control.CallSub(SetContextMenu)
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.Control.CallSub(ErrorMessage, "ErrorNumber", V.Ambient.ErrorNumber, "ErrorDescription", V.Ambient.ErrorDescription, "Subroutine", V.Ambient.CurrentSubroutine)
+F.Intrinsic.Control.EndTry
+Program.Sub.Main.End
+
+Program.Sub.NameMonthColumns.Start
+F.Intrinsic.Control.Try
+
+V.Local.sMonth.Declare(String)
+
+'Set month name corresponding to month number
+F.Intrinsic.Control.SelectCase(V.Args.Month)
+	F.Intrinsic.Control.Case("1")
+		V.Local.sMonth.Set("JAN")
+		F.Intrinsic.Variable.AddRV("Month", V.Local.sMonth)
+	F.Intrinsic.Control.Case("2")
+		V.Local.sMonth.Set("FEB")
+		F.Intrinsic.Variable.AddRV("Month", V.Local.sMonth)
+	F.Intrinsic.Control.Case("3")
+		V.Local.sMonth.Set("MAR")
+		F.Intrinsic.Variable.AddRV("Month", V.Local.sMonth)
+	F.Intrinsic.Control.Case("4")
+		V.Local.sMonth.Set("APR")
+		F.Intrinsic.Variable.AddRV("Month", V.Local.sMonth)
+	F.Intrinsic.Control.Case("5")
+		V.Local.sMonth.Set("MAY")
+		F.Intrinsic.Variable.AddRV("Month", V.Local.sMonth)
+	F.Intrinsic.Control.Case("6")
+		V.Local.sMonth.Set("JUN")
+		F.Intrinsic.Variable.AddRV("Month", V.Local.sMonth)
+	F.Intrinsic.Control.Case("7")
+		V.Local.sMonth.Set("JUL")
+		F.Intrinsic.Variable.AddRV("Month", V.Local.sMonth)
+	F.Intrinsic.Control.Case("8")
+		V.Local.sMonth.Set("AUG")
+		F.Intrinsic.Variable.AddRV("Month", V.Local.sMonth)
+	F.Intrinsic.Control.Case("9")
+		V.Local.sMonth.Set("SEP")
+		F.Intrinsic.Variable.AddRV("Month", V.Local.sMonth)
+	F.Intrinsic.Control.Case("10")
+		V.Local.sMonth.Set("OCT")
+		F.Intrinsic.Variable.AddRV("Month", V.Local.sMonth)
+	F.Intrinsic.Control.Case("11")
+		V.Local.sMonth.Set("NOV")
+		F.Intrinsic.Variable.AddRV("Month", V.Local.sMonth)
+	F.Intrinsic.Control.Case("12")
+		V.Local.sMonth.Set("DEC")
+		F.Intrinsic.Variable.AddRV("Month", V.Local.sMonth)
+		
+F.Intrinsic.Control.EndSelect
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.Control.CallSub(ErrorMessage, "ErrorNumber", V.Ambient.ErrorNumber, "ErrorDescription", V.Ambient.ErrorDescription, "Subroutine", V.Ambient.CurrentSubroutine)
+F.Intrinsic.Control.EndTry
+Program.Sub.NameMonthColumns.End
+
+Program.Sub.LoadData.Start
+F.Intrinsic.Control.Try
+
+V.Local.sMonth.Declare(String)
+V.Local.sYear.Declare(String)
+V.Local.iCount.Declare(Long)
+V.Local.sRet.Declare(Long)
+V.Local.sColumn.Declare(String)
+V.Local.sEstColumn.Declare(String)
+V.Local.sActColumn.Declare(String)
+V.Local.sExpression.Declare(String)
+V.Local.sStatus.Declare(String)
+V.Local.sCondition.Declare(String)
+V.Local.sSql.Declare(String)
+V.Local.sCacheTime.Declare(String)
+V.Local.sLabel.Declare(String)
+
+'Invoke loading screen
+F.Intrinsic.UI.InvokeWaitDialog("Loading...", "Employee Evaluation Dashboard (6979)")
+
+'Clear month order list for subsequent loads
+V.Global.sMonthOrder.Set("")
+
+'Get last cache date/time and set on label
+F.ODBC.Connection!con.ExecuteAndReturn("SELECT TOP 1 CACHE_DATE, CACHE_TIME FROM GCG_6979_LOG WHERE SUCCESS = '1' ORDER BY CACHE_DATE DESC, CACHE_TIME DESC", V.Local.sCacheTime)
+F.Intrinsic.Control.If(V.Local.sCacheTime, !=, "")
+	F.Intrinsic.String.Split(V.Local.sCacheTime, "*!*", V.Local.sCacheTime)
+	F.Intrinsic.String.Build("Time last cached: {0} {1}", V.Local.sCacheTime(0), V.Local.sCacheTime(1), V.Local.sLabel)
+	GUI.EmpEval.lblCacheTime.Text(V.Local.sLabel)
+
+F.Intrinsic.Control.Else
+	GUI.EmpEval.lblCacheTime.Text("Time last cached: **NO TIMESTAMP FOUND")
+	
+F.Intrinsic.Control.EndIf
+
+'Create Dictionaries to capture montly estimate totals
+F.Intrinsic.Control.If(V.DataTable.dtTotals.Exists, =, False)
+	F.Data.Datatable.CreateFromSQL("dtTotals", "con", "select RTRIM(EMPL) + CONCAT(month(DATE_SEQUENCE), year(DATE_SEQUENCE)) as DICT_KEY, SUM(ACT_HRS) ACT_HRS, SUM(EST_HRS) EST_HRS from GCG_6979_EMPL_EVAL where EMPL not like '#%' group by DICT_KEY")
+	F.Data.Dictionary.CreateFromDatatable("dictActual", "dtTotals", "DICT_KEY", "ACT_HRS")
+	F.Data.Dictionary.CreateFromDatatable("dictEstimated", "dtTotals", "DICT_KEY", "EST_HRS")
+	
+F.Intrinsic.Control.EndIf
+
+F.Intrinsic.Control.If(V.DataTable.dtAll.Exists)
+	F.Data.Datatable.Close("dtAll")
+	
+F.Intrinsic.Control.EndIf
+
+'Capture initial datatable data for employees
+F.Data.Datatable.CreateFromSQL("dtAll", "con", "select distinct RTRIM(EMPL) EMPL, RTRIM(EMPLOYEE) EMPLOYEE, '' as DEPT_EMP, ACTIVE from GCG_6979_EMPL_EVAL where EMPL < '98000' and EMPL not like '#%' and EMPLOYEE not like '*%'", True)
+
+'Create dictionary to fill in current employees department
+F.Data.Dictionary.CreateFromSQL("dictDepts", "con", "select RTRIM(EMPLOYEE), RTRIM(DEPT_EMPLOYEE) from EMPLOYEE_MSTR")
+F.Data.Dictionary.SetDefaultReturn("dictDepts", "")
+F.Data.Datatable.FillFromDictionary("dtAll", "dictDepts", "EMPL", "DEPT_EMP")
+F.Data.Dictionary.Close("dictDepts")
+
+F.Intrinsic.Date.Month(V.Ambient.Now, V.Local.sMonth)
+F.Intrinsic.Date.Year(V.Ambient.Now, V.Local.sYear)
+
+'Loop to create column names in the correct order starting with current date back 12 months
+F.Intrinsic.Control.For(V.Local.iCount, 1, 12, 1)
+	F.Intrinsic.String.Build("{0}{1}", V.Local.sMonth, V.Local.sYear, V.Local.sRet)
+	F.Intrinsic.Control.CallSub(NameMonthColumns, "Month", V.Local.sMonth)
+	F.Data.Datatable.AddColumn("dtAll", V.Args.Month, "String")
+	F.Data.Datatable.SetValue("dtAll", -1, V.Args.Month, V.Local.sRet)
+	
+	F.Intrinsic.String.Build("{0}_KEY", V.Args.Month, V.Local.sColumn)
+	F.Intrinsic.String.Build("[EMPL] + [{0}]", V.Args.Month, V.Local.sExpression)
+	F.Data.Datatable.AddExpressionColumn("dtAll", V.Local.sColumn, "String", V.Local.sExpression)
+	
+	'Subtract month by 1. If current month is 1 (Jan) loop back to month 12 (Dec) and decrease year by 1
+	F.Intrinsic.Control.If(V.Local.sMonth, =, 1)
+		V.Local.sMonth.Set(12)
+		F.Intrinsic.Math.Sub(V.Local.sYear, 1, V.Local.sYear)
+	F.Intrinsic.Control.Else
+		F.Intrinsic.Math.Sub(V.Local.sMonth, 1, V.Local.sMonth)
+	F.Intrinsic.Control.EndIf
+	
+	'Create month order depending on current month
+	F.Intrinsic.Control.If(V.Global.sMonthOrder, =, "")
+		V.Global.sMonthOrder.Set(V.Local.sColumn)
+	F.Intrinsic.Control.Else
+		F.Intrinsic.String.Build("{0}*!*{1}", V.Global.sMonthOrder, V.Local.sColumn, V.Global.sMonthOrder)
+	F.Intrinsic.Control.EndIf
+		
+F.Intrinsic.Control.Next(V.Local.iCount)
+
+'Loop through month list to gather estimated and actual totals for each month
+F.Intrinsic.String.Split(V.Global.sMonthOrder, "*!*", V.Global.sMonthOrder)
+F.Intrinsic.Control.For(V.Local.iCount, 0, V.Global.sMonthOrder.UBound, 1)
+	'Add Estimated Hrs totals
+	F.Intrinsic.String.Left(V.Global.sMonthOrder(V.Local.iCount), 3, V.Local.sColumn)
+	F.Intrinsic.String.Build("{0}_EST", V.Local.sColumn, V.Local.sEstColumn)
+	F.Data.Datatable.AddColumn("dtAll", V.Local.sEstColumn, "Float")
+	F.Data.Datatable.FillFromDictionary("dtAll", "dictEstimated", V.Global.sMonthOrder(V.Local.iCount), V.Local.sEstColumn)
+	
+	'Add Actual Hrs totals
+	F.Intrinsic.String.Left(V.Global.sMonthOrder(V.Local.iCount), 3, V.Local.sColumn)
+	F.Intrinsic.String.Build("{0}_ACT", V.Local.sColumn, V.Local.sActColumn)
+	F.Data.Datatable.AddColumn("dtAll", V.Local.sActColumn, "Float")
+	F.Data.Datatable.FillFromDictionary("dtAll", "dictActual", V.Global.sMonthOrder(V.Local.iCount), V.Local.sActColumn)
+	
+	'Add Difference totals
+	F.Intrinsic.String.Left(V.Global.sMonthOrder(V.Local.iCount), 3, V.Local.sColumn)
+	F.Intrinsic.String.Build("{0}_DIFF", V.Local.sColumn, V.Local.sColumn)
+	F.Intrinsic.String.Build("[{0}] - [{1}]", V.Local.sEstColumn, V.Local.sActColumn, V.Local.sExpression)
+	F.Data.Datatable.AddExpressionColumn("dtAll", V.Local.sColumn, "Float", V.Local.sExpression)
+	
+	'Add Efficiency totals
+	F.Intrinsic.String.Left(V.Global.sMonthOrder(V.Local.iCount), 3, V.Local.sColumn)
+	F.Intrinsic.String.Build("{0}_%", V.Local.sColumn, V.Local.sColumn)
+	F.Intrinsic.String.Build("IIF([{0}] = 0 OR [{1}] = 0, 0, [{0}] / [{1}])", V.Local.sEstColumn, V.Local.sActColumn, V.Local.sExpression)
+	F.Data.Datatable.AddExpressionColumn("dtAll", V.Local.sColumn, "Float", V.Local.sExpression)
+
+F.Intrinsic.Control.Next(V.Local.iCount)
+
+F.Data.Datatable.AddExpressionColumn("dtAll", "YTD_EST", "Float", "IsNull(JAN_EST, 0) + IsNull(FEB_EST, 0) + IsNull(MAR_EST, 0) + IsNull(APR_EST, 0) + IsNull(MAY_EST, 0) + IsNull(JUN_EST, 0) + IsNull(JUL_EST, 0) + IsNull(AUG_EST, 0) + IsNull(SEP_EST, 0) + IsNull(OCT_EST, 0) + IsNull(NOV_EST, 0) + IsNull(DEC_EST, 0)")
+F.Data.Datatable.AddExpressionColumn("dtAll", "YTD_ACT", "Float", "IsNull(JAN_ACT, 0) + IsNull(FEB_ACT, 0) + IsNull(MAR_ACT, 0) + IsNull(APR_ACT, 0) + IsNull(MAY_ACT, 0) + IsNull(JUN_ACT, 0) + IsNull(JUL_ACT, 0) + IsNull(AUG_ACT, 0) + IsNull(SEP_ACT, 0) + IsNull(OCT_ACT, 0) + IsNull(NOV_ACT, 0) + IsNull(DEC_ACT, 0)")
+F.Data.Datatable.AddExpressionColumn("dtAll", "YTD_%", "Float", "IIF([YTD_EST] = 0 OR [YTD_ACT] = 0, 0, [YTD_EST] / [YTD_ACT])")
+
+F.Data.Dictionary.Close("dictActual")
+F.Data.Dictionary.Close("dictEstimated")
+
+'Load active, inactive, and all employee status views.
+F.Data.DataView.Create("dtAll", "dvAll", 22, "", "")
+F.Data.DataView.Create("dtAll", "dvY", 22, "ACTIVE = 'Y'", "")
+F.Data.DataView.Create("dtAll", "dvN", 22, "ACTIVE = 'N'", "")
+
+F.Intrinsic.Control.CallSub(FormatData)
+
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.Control.CallSub(ErrorMessage, "ErrorNumber", V.Ambient.ErrorNumber, "ErrorDescription", V.Ambient.ErrorDescription, "Subroutine", V.Ambient.CurrentSubroutine)
+F.Intrinsic.Control.EndTry
+Program.Sub.LoadData.End
+
+Program.Sub.FormatData.Start
+F.Intrinsic.Control.Try
+
+F.Intrinsic.Control.SelectCase(V.Screen.EmpEval!ddlStatus.Text)
+
+'Set sql condition depending on dropdown selection
+F.Intrinsic.Control.Case("All")
+	GUI.EmpEval.GSGC_EmpEval.AddGridviewFromDataview("gvAll", "dtAll", "dvAll")
+F.Intrinsic.Control.Case("Active")
+	GUI.EmpEval.GSGC_EmpEval.AddGridviewFromDataview("gvAll", "dtAll", "dvY")
+F.Intrinsic.Control.Case("Inactive")
+	GUI.EmpEval.GSGC_EmpEval.AddGridviewFromDataview("gvAll", "dtAll", "dvN")
+F.Intrinsic.Control.EndSelect
+
+'Set gridview properties
+GUI.EmpEval.GSGC_EmpEval.SetGridviewProperty("gvAll", V.Enum.GridViewPropertyNames!ColumnAutoWidth, False)
+GUI.EmpEval.GSGC_EmpEval.SetGridviewProperty("gvAll", V.Enum.GridViewPropertyNames!AllowColumnResizing, True)
+GUI.EmpEval.GSGC_EmpEval.SetGridviewProperty("gvAll", "ShowConditionalFormattingItem", True)
+
+'Set column locked properties
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "EMPL", "Fixed", "Left")
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "EMPLOYEE", "Fixed", "Left")
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "DEPT_EMP", "Fixed", "Left")
+
+'Hide uneeded columns
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "JAN_KEY", "Visible", False)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "FEB_KEY", "Visible", False)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "MAR_KEY", "Visible", False)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "APR_KEY", "Visible", False)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "MAY_KEY", "Visible", False)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "JUN_KEY", "Visible", False)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "JUL_KEY", "Visible", False)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "AUG_KEY", "Visible", False)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "SEP_KEY", "Visible", False)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "OCT_KEY", "Visible", False)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "NOV_KEY", "Visible", False)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "DEC_KEY", "Visible", False)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "JAN", "Visible", False)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "FEB", "Visible", False)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "MAR", "Visible", False)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "APR", "Visible", False)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "MAY", "Visible", False)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "JUN", "Visible", False)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "JUL", "Visible", False)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "AUG", "Visible", False)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "SEP", "Visible", False)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "OCT", "Visible", False)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "NOV", "Visible", False)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "DEC", "Visible", False)
+
+'Set show/hide options
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "JAN_KEY", "AllowShowHide", False)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "FEB_KEY", "AllowShowHide", False)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "MAR_KEY", "AllowShowHide", False)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "APR_KEY", "AllowShowHide", False)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "MAY_KEY", "AllowShowHide", False)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "JUN_KEY", "AllowShowHide", False)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "JUL_KEY", "AllowShowHide", False)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "AUG_KEY", "AllowShowHide", False)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "SEP_KEY", "AllowShowHide", False)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "OCT_KEY", "AllowShowHide", False)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "NOV_KEY", "AllowShowHide", False)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "DEC_KEY", "AllowShowHide", False)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "JAN", "AllowShowHide", False)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "FEB", "AllowShowHide", False)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "MAR", "AllowShowHide", False)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "APR", "AllowShowHide", False)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "MAY", "AllowShowHide", False)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "JUN", "AllowShowHide", False)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "JUL", "AllowShowHide", False)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "AUG", "AllowShowHide", False)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "SEP", "AllowShowHide", False)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "OCT", "AllowShowHide", False)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "NOV", "AllowShowHide", False)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "DEC", "AllowShowHide", False)
+
+'Bold table headers
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "EMPL", "HeaderFontBold", True)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "EMPLOYEE", "HeaderFontBold", True)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "DEPT_EMP", "HeaderFontBold", True)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "JAN_EST", "HeaderFontBold", True)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "FEB_EST", "HeaderFontBold", True)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "MAR_EST", "HeaderFontBold", True)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "APR_EST", "HeaderFontBold", True)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "MAY_EST", "HeaderFontBold", True)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "JUN_EST", "HeaderFontBold", True)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "JUL_EST", "HeaderFontBold", True)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "AUG_EST", "HeaderFontBold", True)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "SEP_EST", "HeaderFontBold", True)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "OCT_EST", "HeaderFontBold", True)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "NOV_EST", "HeaderFontBold", True)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "DEC_EST", "HeaderFontBold", True)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "JAN_ACT", "HeaderFontBold", True)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "FEB_ACT", "HeaderFontBold", True)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "MAR_ACT", "HeaderFontBold", True)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "APR_ACT", "HeaderFontBold", True)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "MAY_ACT", "HeaderFontBold", True)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "JUN_ACT", "HeaderFontBold", True)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "JUL_ACT", "HeaderFontBold", True)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "AUG_ACT", "HeaderFontBold", True)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "SEP_ACT", "HeaderFontBold", True)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "OCT_ACT", "HeaderFontBold", True)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "NOV_ACT", "HeaderFontBold", True)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "DEC_ACT", "HeaderFontBold", True)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "JAN_DIFF", "HeaderFontBold", True)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "FEB_DIFF", "HeaderFontBold", True)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "MAR_DIFF", "HeaderFontBold", True)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "APR_DIFF", "HeaderFontBold", True)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "MAY_DIFF", "HeaderFontBold", True)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "JUN_DIFF", "HeaderFontBold", True)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "JUL_DIFF", "HeaderFontBold", True)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "AUG_DIFF", "HeaderFontBold", True)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "SEP_DIFF", "HeaderFontBold", True)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "OCT_DIFF", "HeaderFontBold", True)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "NOV_DIFF", "HeaderFontBold", True)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "DEC_DIFF", "HeaderFontBold", True)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "JAN_%", "HeaderFontBold", True)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "FEB_%", "HeaderFontBold", True)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "MAR_%", "HeaderFontBold", True)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "APR_%", "HeaderFontBold", True)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "MAY_%", "HeaderFontBold", True)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "JUN_%", "HeaderFontBold", True)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "JUL_%", "HeaderFontBold", True)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "AUG_%", "HeaderFontBold", True)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "SEP_%", "HeaderFontBold", True)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "OCT_%", "HeaderFontBold", True)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "NOV_%", "HeaderFontBold", True)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "DEC_%", "HeaderFontBold", True)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "YTD_EST", "HeaderFontBold", True)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "YTD_ACT", "HeaderFontBold", True)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "YTD_%", "HeaderFontBold", True)
+
+'Set allow edit properties
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "EMPL", "AllowEdit", False)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "EMPLOYEE", "AllowEdit", False)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "DEPT_EMP", "AllowEdit", False)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "JAN_EST", "AllowEdit", False)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "FEB_EST", "AllowEdit", False)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "MAR_EST", "AllowEdit", False)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "APR_EST", "AllowEdit", False)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "MAY_EST", "AllowEdit", False)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "JUN_EST", "AllowEdit", False)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "JUL_EST", "AllowEdit", False)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "AUG_EST", "AllowEdit", False)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "SEP_EST", "AllowEdit", False)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "OCT_EST", "AllowEdit", False)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "NOV_EST", "AllowEdit", False)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "DEC_EST", "AllowEdit", False)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "JAN_ACT", "AllowEdit", False)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "FEB_ACT", "AllowEdit", False)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "MAR_ACT", "AllowEdit", False)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "APR_ACT", "AllowEdit", False)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "MAY_ACT", "AllowEdit", False)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "JUN_ACT", "AllowEdit", False)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "JUL_ACT", "AllowEdit", False)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "AUG_ACT", "AllowEdit", False)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "SEP_ACT", "AllowEdit", False)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "OCT_ACT", "AllowEdit", False)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "NOV_ACT", "AllowEdit", False)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "DEC_ACT", "AllowEdit", False)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "JAN_DIFF", "AllowEdit", False)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "FEB_DIFF", "AllowEdit", False)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "MAR_DIFF", "AllowEdit", False)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "APR_DIFF", "AllowEdit", False)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "MAY_DIFF", "AllowEdit", False)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "JUN_DIFF", "AllowEdit", False)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "JUL_DIFF", "AllowEdit", False)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "AUG_DIFF", "AllowEdit", False)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "SEP_DIFF", "AllowEdit", False)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "OCT_DIFF", "AllowEdit", False)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "NOV_DIFF", "AllowEdit", False)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "DEC_DIFF", "AllowEdit", False)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "JAN_%", "AllowEdit", False)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "FEB_%", "AllowEdit", False)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "MAR_%", "AllowEdit", False)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "APR_%", "AllowEdit", False)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "MAY_%", "AllowEdit", False)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "JUN_%", "AllowEdit", False)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "JUL_%", "AllowEdit", False)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "AUG_%", "AllowEdit", False)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "SEP_%", "AllowEdit", False)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "OCT_%", "AllowEdit", False)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "NOV_%", "AllowEdit", False)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "DEC_%", "AllowEdit", False)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "YTD_EST", "AllowEdit", False)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "YTD_ACT", "AllowEdit", False)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "YTD_%", "AllowEdit", False)
+
+'Set read only properties
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "EMPL", "ReadOnly", True)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "EMPLOYEE", "ReadOnly", True)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "DEPT_EMP", "ReadOnly", True)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "JAN_EST", "ReadOnly", True)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "FEB_EST", "ReadOnly", True)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "MAR_EST", "ReadOnly", True)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "APR_EST", "ReadOnly", True)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "MAY_EST", "ReadOnly", True)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "JUN_EST", "ReadOnly", True)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "JUL_EST", "ReadOnly", True)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "AUG_EST", "ReadOnly", True)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "SEP_EST", "ReadOnly", True)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "OCT_EST", "ReadOnly", True)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "NOV_EST", "ReadOnly", True)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "DEC_EST", "ReadOnly", True)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "JAN_ACT", "ReadOnly", True)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "FEB_ACT", "ReadOnly", True)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "MAR_ACT", "ReadOnly", True)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "APR_ACT", "ReadOnly", True)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "MAY_ACT", "ReadOnly", True)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "JUN_ACT", "ReadOnly", True)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "JUL_ACT", "ReadOnly", True)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "AUG_ACT", "ReadOnly", True)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "SEP_ACT", "ReadOnly", True)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "OCT_ACT", "ReadOnly", True)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "NOV_ACT", "ReadOnly", True)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "DEC_ACT", "ReadOnly", True)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "JAN_DIFF", "ReadOnly", True)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "FEB_DIFF", "ReadOnly", True)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "MAR_DIFF", "ReadOnly", True)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "APR_DIFF", "ReadOnly", True)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "MAY_DIFF", "ReadOnly", True)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "JUN_DIFF", "ReadOnly", True)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "JUL_DIFF", "ReadOnly", True)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "AUG_DIFF", "ReadOnly", True)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "SEP_DIFF", "ReadOnly", True)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "OCT_DIFF", "ReadOnly", True)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "NOV_DIFF", "ReadOnly", True)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "DEC_DIFF", "ReadOnly", True)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "JAN_%", "ReadOnly", True)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "FEB_%", "ReadOnly", True)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "MAR_%", "ReadOnly", True)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "APR_%", "ReadOnly", True)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "MAY_%", "ReadOnly", True)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "JUN_%", "ReadOnly", True)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "JUL_%", "ReadOnly", True)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "AUG_%", "ReadOnly", True)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "SEP_%", "ReadOnly", True)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "OCT_%", "ReadOnly", True)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "NOV_%", "ReadOnly", True)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "DEC_%", "ReadOnly", True)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "YTD_EST", "ReadOnly", True)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "YTD_ACT", "ReadOnly", True)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "YTD_%", "ReadOnly", True)
+
+'Set numeric fomat
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "JAN_EST", "DisplayCustomNumeric", "#,###,###,##0.00")
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "FEB_EST", "DisplayCustomNumeric", "#,###,###,##0.00")
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "MAR_EST", "DisplayCustomNumeric", "#,###,###,##0.00")
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "APR_EST", "DisplayCustomNumeric", "#,###,###,##0.00")
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "MAY_EST", "DisplayCustomNumeric", "#,###,###,##0.00")
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "JUN_EST", "DisplayCustomNumeric", "#,###,###,##0.00")
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "JUL_EST", "DisplayCustomNumeric", "#,###,###,##0.00")
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "AUG_EST", "DisplayCustomNumeric", "#,###,###,##0.00")
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "SEP_EST", "DisplayCustomNumeric", "#,###,###,##0.00")
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "OCT_EST", "DisplayCustomNumeric", "#,###,###,##0.00")
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "NOV_EST", "DisplayCustomNumeric", "#,###,###,##0.00")
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "DEC_EST", "DisplayCustomNumeric", "#,###,###,##0.00")
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "JAN_ACT", "DisplayCustomNumeric", "#,###,###,##0.00")
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "FEB_ACT", "DisplayCustomNumeric", "#,###,###,##0.00")
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "MAR_ACT", "DisplayCustomNumeric", "#,###,###,##0.00")
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "APR_ACT", "DisplayCustomNumeric", "#,###,###,##0.00")
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "MAY_ACT", "DisplayCustomNumeric", "#,###,###,##0.00")
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "JUN_ACT", "DisplayCustomNumeric", "#,###,###,##0.00")
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "JUL_ACT", "DisplayCustomNumeric", "#,###,###,##0.00")
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "AUG_ACT", "DisplayCustomNumeric", "#,###,###,##0.00")
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "SEP_ACT", "DisplayCustomNumeric", "#,###,###,##0.00")
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "OCT_ACT", "DisplayCustomNumeric", "#,###,###,##0.00")
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "NOV_ACT", "DisplayCustomNumeric", "#,###,###,##0.00")
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "DEC_ACT", "DisplayCustomNumeric", "#,###,###,##0.00")
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "JAN_DIFF", "DisplayCustomNumeric", "#,###,###,##0.00")
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "FEB_DIFF", "DisplayCustomNumeric", "#,###,###,##0.00")
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "MAR_DIFF", "DisplayCustomNumeric", "#,###,###,##0.00")
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "APR_DIFF", "DisplayCustomNumeric", "#,###,###,##0.00")
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "MAY_DIFF", "DisplayCustomNumeric", "#,###,###,##0.00")
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "JUN_DIFF", "DisplayCustomNumeric", "#,###,###,##0.00")
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "JUL_DIFF", "DisplayCustomNumeric", "#,###,###,##0.00")
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "AUG_DIFF", "DisplayCustomNumeric", "#,###,###,##0.00")
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "SEP_DIFF", "DisplayCustomNumeric", "#,###,###,##0.00")
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "OCT_DIFF", "DisplayCustomNumeric", "#,###,###,##0.00")
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "NOV_DIFF", "DisplayCustomNumeric", "#,###,###,##0.00")
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "DEC_DIFF", "DisplayCustomNumeric", "#,###,###,##0.00")
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "JAN_%", "DisplayCustomNumeric", "#,###,###,##0.00%")
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "FEB_%", "DisplayCustomNumeric", "#,###,###,##0.00%")
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "MAR_%", "DisplayCustomNumeric", "#,###,###,##0.00%")
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "APR_%", "DisplayCustomNumeric", "#,###,###,##0.00%")
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "MAY_%", "DisplayCustomNumeric", "#,###,###,##0.00%")
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "JUN_%", "DisplayCustomNumeric", "#,###,###,##0.00%")
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "JUL_%", "DisplayCustomNumeric", "#,###,###,##0.00%")
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "AUG_%", "DisplayCustomNumeric", "#,###,###,##0.00%")
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "SEP_%", "DisplayCustomNumeric", "#,###,###,##0.00%")
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "OCT_%", "DisplayCustomNumeric", "#,###,###,##0.00%")
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "NOV_%", "DisplayCustomNumeric", "#,###,###,##0.00%")
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "DEC_%", "DisplayCustomNumeric", "#,###,###,##0.00%")
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "YTD_EST", "DisplayCustomNumeric", "#,###,###,##0.00")
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "YTD_ACT", "DisplayCustomNumeric", "#,###,###,##0.00")
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "YTD_%", "DisplayCustomNumeric", "#,###,###,##0.00%")
+
+'Set column captions
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "EMPL", "Caption", "Empl No")
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "EMPLOYEE", "Caption", "Name")
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "DEPT_EMP", "Caption", "Department")
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "JAN_EST", "Caption", "Jan Est")
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "FEB_EST", "Caption", "Feb Est")
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "MAR_EST", "Caption", "Mar Est")
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "APR_EST", "Caption", "Apr Est")
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "MAY_EST", "Caption", "May Est")
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "JUN_EST", "Caption", "Jun Est")
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "JUL_EST", "Caption", "Jul Est")
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "AUG_EST", "Caption", "Aug Est")
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "SEP_EST", "Caption", "Sep Est")
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "OCT_EST", "Caption", "Oct Est")
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "NOV_EST", "Caption", "Nov Est")
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "DEC_EST", "Caption", "Dec Est")
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "JAN_ACT", "Caption", "Jan Act")
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "FEB_ACT", "Caption", "Feb Act")
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "MAR_ACT", "Caption", "Mar Act")
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "APR_ACT", "Caption", "Apr Act")
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "MAY_ACT", "Caption", "May Act")
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "JUN_ACT", "Caption", "Jun Act")
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "JUL_ACT", "Caption", "Jul Act")
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "AUG_ACT", "Caption", "Aug Act")
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "SEP_ACT", "Caption", "Sep Act")
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "OCT_ACT", "Caption", "Oct Act")
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "NOV_ACT", "Caption", "Nov Act")
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "DEC_ACT", "Caption", "Dec Act")
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "JAN_DIFF", "Caption", "Jan Diff")
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "FEB_DIFF", "Caption", "Feb Diff")
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "MAR_DIFF", "Caption", "Mar Diff")
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "APR_DIFF", "Caption", "Apr Diff")
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "MAY_DIFF", "Caption", "May Diff")
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "JUN_DIFF", "Caption", "Jun Diff")
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "JUL_DIFF", "Caption", "Jul Diff")
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "AUG_DIFF", "Caption", "Aug Diff")
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "SEP_DIFF", "Caption", "Sep Diff")
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "OCT_DIFF", "Caption", "Oct Diff")
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "NOV_DIFF", "Caption", "Nov Diff")
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "DEC_DIFF", "Caption", "Dec Diff")
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "JAN_%", "Caption", "Jan %")
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "FEB_%", "Caption", "Feb %")
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "MAR_%", "Caption", "Mar %")
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "APR_%", "Caption", "Apr %")
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "MAY_%", "Caption", "May %")
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "JUN_%", "Caption", "Jun %")
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "JUL_%", "Caption", "Jul %")
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "AUG_%", "Caption", "Aug %")
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "SEP_%", "Caption", "Sep %")
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "OCT_%", "Caption", "Oct %")
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "NOV_%", "Caption", "Nov %")
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "DEC_%", "Caption", "Dec %")
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "YTD_EST", "Caption", "YTD Est")
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "YTD_ACT", "Caption", "YTD Act")
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "YTD_%", "Caption", "YTD %")
+
+'Set visible index
+V.Local.iVisibleIndex.Declare(Long)
+V.Local.iVisibleIndex.Set(-1)
+V.Local.sMonth.Declare(String)
+V.Local.sColumn.Declare(String)
+V.Local.iCount.Declare(Long)
+
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "EMPL", V.Enum.ColumnPropertyNames!VisibleIndex, V.Local.iVisibleIndex.++)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "EMPLOYEE", V.Enum.ColumnPropertyNames!VisibleIndex, V.Local.iVisibleIndex.++)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "DEPT_EMP", V.Enum.ColumnPropertyNames!VisibleIndex, V.Local.iVisibleIndex.++)
+
+'Loop through month order to set index for actuals, estimates ,and difference depending on todays date
+F.Intrinsic.Control.For(V.Local.iCount, V.Global.sMonthOrder.UBound, 0, -1)
+	F.Intrinsic.String.Left(V.Global.sMonthOrder(V.Local.iCount), 3, V.Local.sMonth)
+	F.Intrinsic.String.Build("{0}_EST", V.Local.sMonth, V.Local.sColumn)
+	GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", V.Local.sColumn, V.Enum.ColumnPropertyNames!VisibleIndex, V.Local.iVisibleIndex.++)
+	F.Intrinsic.String.Build("{0}_ACT", V.Local.sMonth, V.Local.sColumn)
+	GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", V.Local.sColumn, V.Enum.ColumnPropertyNames!VisibleIndex, V.Local.iVisibleIndex.++)
+	F.Intrinsic.String.Build("{0}_DIFF", V.Local.sMonth, V.Local.sColumn)
+	GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", V.Local.sColumn, V.Enum.ColumnPropertyNames!VisibleIndex, V.Local.iVisibleIndex.++)
+	
+F.Intrinsic.Control.Next(V.Local.iCount)
+
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "YTD_EST", V.Enum.ColumnPropertyNames!VisibleIndex, V.Local.iVisibleIndex.++)
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "YTD_ACT", V.Enum.ColumnPropertyNames!VisibleIndex, V.Local.iVisibleIndex.++)
+
+'Loop through month order to set index for month efficiencies
+F.Intrinsic.Control.For(V.Local.iCount, V.Global.sMonthOrder.UBound, 0, -1)
+	F.Intrinsic.String.Left(V.Global.sMonthOrder(V.Local.iCount), 3, V.Local.sMonth)
+	F.Intrinsic.String.Build("{0}_%", V.Local.sMonth, V.Local.sColumn)
+	GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", V.Local.sColumn, V.Enum.ColumnPropertyNames!VisibleIndex, V.Local.iVisibleIndex.++)
+	
+F.Intrinsic.Control.Next(V.Local.iCount)
+
+GUI.EmpEval.GSGC_EmpEval.SetColumnProperty("gvAll", "YTD_%", V.Enum.ColumnPropertyNames!VisibleIndex, V.Local.iVisibleIndex.++)
+
+GUI.EmpEval.GSGC_EmpEval.MainView("gvAll")
+F.Intrinsic.Control.CallSub(Deserialize)
+F.Intrinsic.UI.CloseWaitDialog
+F.ODBC.Connection!con.Close
+GUI.EmpEval..Show
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.Control.CallSub(ErrorMessage, "ErrorNumber", V.Ambient.ErrorNumber, "ErrorDescription", V.Ambient.ErrorDescription, "Subroutine", V.Ambient.CurrentSubroutine)
+F.Intrinsic.Control.EndTry
+Program.Sub.FormatData.End
+
+Program.Sub.Refresh.Start
+'F.Intrinsic.Control.Try
+
+'GUI.EmpEval.GSGC_EmpEval.Visible(False)
+'GUI.EmpEval.GSGC_EmpEval.SuspendLayout()
+'F.Intrinsic.Control.CallSub(LoadData)
+'GUI.EmpEval.GSGC_EmpEval.ResumeLayout()
+'GUI.EmpEval.GSGC_EmpEval.Visible(True)
+
+'F.Intrinsic.Control.Catch
+'	F.Intrinsic.Control.CallSub(ErrorMessage, "ErrorNumber", V.Ambient.ErrorNumber, "ErrorDescription", V.Ambient.ErrorDescription, "Subroutine", V.Ambient.CurrentSubroutine)
+'F.Intrinsic.Control.EndTry
+Program.Sub.Refresh.End
+
+Program.Sub.SetContextMenu.Start
+F.Intrinsic.Control.Try
+
+'Create and attach context menus to grid "gvAll"
+GUI.EmpEval..ContextMenuCreate("ContextMenu1")
+GUI.EmpEval.GSGC_EmpEval.ContextMenuAttach("ContextMenu1")
+'Export to excel
+GUI.EmpEval..ContextMenuAddItem("ContextMenu1", "Export", 0, "Export to Spreadsheet")
+GUI.EmpEval..ContextMenuSetItemEventHandler("ContextMenu1", "Export", "Export")
+'Print to Crystal
+GUI.EmpEval..ContextMenuAddItem("ContextMenu1", "PrintToCrystal", 0, "Export to Crystal")
+GUI.EmpEval..ContextMenuSetItemEventHandler("ContextMenu1", "PrintToCrystal", "PrintToCrystal")
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.Control.CallSub(ErrorMessage, "ErrorNumber", V.Ambient.ErrorNumber, "ErrorDescription", V.Ambient.ErrorDescription, "Subroutine", V.Ambient.CurrentSubroutine)
+F.Intrinsic.Control.EndTry
+Program.Sub.SetContextMenu.End
+
+Program.Sub.Export.Start
+F.Intrinsic.Control.Try
+
+V.Local.bFileLocked.Declare(Boolean)
+V.Local.sFileExport.Declare(String)
+V.Local.bExcel.Declare(Boolean)
+V.Local.sMsg.Declare(String)
+V.Local.sFileExtension.Declare(String)
+V.Local.sRet.Declare(String)
+
+GUI.EmpEval.GSGC_EmpEval.CreateDataView("gvAll", "dtAll", "dvFiltered")
+
+'Check for Excel on machine to export as .xlsx
+F.Automation.MSExcel.CheckPresence(V.Local.bExcel)
+
+'Export as either xlsx or csv depending on availability of Excel
+F.Intrinsic.Control.If(V.Local.bExcel)
+	V.Local.sFileExtension.Set("xlsx")
+F.Intrinsic.Control.Else
+	V.Local.sFileExtension.Set("csv")
+F.Intrinsic.Control.EndIf
+
+F.Intrinsic.String.Build("{0}EmpEvalExport.{1}",V.Caller.LocalGSSTempDir,V.Local.sFileExtension,V.Local.sFileExport)
+F.Intrinsic.File.IsFileLocked(V.Local.sFileExport,V.Local.bFileLocked)
+F.Intrinsic.Control.If(V.Local.bFileLocked)
+	F.Intrinsic.String.Build("File is open. Please close and export again.{0}File: {1}",V.Ambient.NewLine,V.Local.sFileExport,V.Local.sMsg)
+	F.Intrinsic.UI.Msgbox(V.Local.sMsg,"File In Use")
+F.Intrinsic.Control.Else
+	GUI.EmpEval.GSGC_EmpEval.Export(V.Local.sFileExport,V.Local.sFileExtension)
+F.Intrinsic.Control.EndIf
+F.Intrinsic.Task.ShellExec(handle,"",V.Local.sFileExport,"","",1)
+
+'Close dataview
+F.Data.DataView.Close("dtAll", "dvFiltered")
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.Control.CallSub(ErrorMessage, "ErrorNumber", V.Ambient.ErrorNumber, "ErrorDescription", V.Ambient.ErrorDescription, "Subroutine", V.Ambient.CurrentSubroutine)
+F.Intrinsic.Control.EndTry
+Program.Sub.Export.End
+
+Program.Sub.PrintToCrystal.Start
+F.Intrinsic.Control.Try
+
+V.Local.sSeq.Declare(String)
+V.Local.iRet.Declare(Long)
+V.Local.sBIRunID.Declare(String)
+V.Local.iCount.Declare(Long)
+V.Local.sEmpIdList.Declare(String)
+V.Local.sSql.Declare(String)
+V.Local.sBI.Declare(String)
+V.Local.sFP.Declare(String)
+
+F.ODBC.Connection!con.OpenCompanyConnection(100)
+
+'Find report ID or create new one if none is found.
+F.Global.BI.GetIDFromName("GCG_6979_EMPL_EVAL.rpt", V.Local.sBI)
+F.Intrinsic.Control.IF(V.Local.sBI, =, -1)
+    F.Global.BI.AddCustomReportID(V.Caller.CompanyCode, "GCG_6979_EMPL_EVAL", , V.Local.sBI)
+    F.Intrinsic.String.Build("{0}\CUSTOM\{1}", V.Caller.BusintDir, "GCG_6979_EMPL_EVAL.rpt", V.Local.sFP)
+    F.Global.BI.AddUserReportSequence(V.Local.sBI,V.Caller.CompanyCode, "GCG_6979_EMPL_EVAL", 0, V.Local.sFP, 16, , 1, False, False, False, V.Local.sSeq)
+    F.Global.BI.ActiVateReportSequence(V.Local.sBI, V.Local.sSeq, V.Caller.CompanyCode, True)
+    
+F.Intrinsic.Control.EndIf
+
+'Get BIRUNID and start logging
+F.Global.BI.GetRunID(V.Global.iBIRUNID)
+F.Global.BI.StartLogging(V.Global.iBIRUNID, V.Local.sBI, -1, V.Global.BILOGID)
+
+'Get currently filtered data from gridview
+GUI.EmpEval.GSGC_EmpEval.CreateDataView("gvAll", "dtAll", "dvFiltered")
+F.Data.DataView.ToDataTable("dtAll", "dvFiltered", "dtFiltered")
+
+'Loop dtFiltered to get list of selected employee IDs
+F.Intrinsic.Control.For(V.Local.iCount, 0, V.DataTable.dtFiltered.RowCount--, 1)
+	F.Intrinsic.Control.If(V.Local.sEmpIdList, =, "")
+		F.Intrinsic.String.Build("'{0}'", V.DataTable.dtFiltered(V.Local.iCount).EMPL!FieldValTrim, V.Local.sEmpIdList)
+	F.Intrinsic.Control.Else
+		F.Intrinsic.String.Build("{0}, '{1}'", V.Local.sEmpIdList, V.DataTable.dtFiltered(V.Local.iCount).EMPL!FieldValTrim, V.Local.sEmpIdList)
+	F.Intrinsic.Control.EndIf
+	
+F.Intrinsic.Control.Next(V.Local.iCount)
+
+'Query data for selected eployee IDs
+F.Intrinsic.String.Build("Select '' As BI_RUN_ID, RTRIM(EMPL) EMPL, MONTH_0, MONTH_1, MONTH_2, MONTH_3, MONTH_4, MONTH_5, MONTH_6, MONTH_7, MONTH_8, MONTH_9, MONTH_10, MONTH_11, YEAR_0, YEAR_1, YEAR_2 from GCG_6979_TOTALS where EMPL in ({0})", V.Local.sEmpIdList, V.Local.sSql)
+F.Data.Datatable.CreateFromSQL("dtToBI", "con", V.Local.sSql)
+'Add BIRUNID to table
+F.Data.Datatable.SetValue("dtToBI", -1, "BI_RUN_ID", V.Global.iBIRUNID)
+
+'Clear BI table records and save new ones
+F.Data.Datatable.SaveToDB("dtToBI", "con", "GCG_6979_BI_REPORTS", True, 128)
+
+'Set BIRUNID to string to pass to RunReportPreProcessor function
+V.Local.sBIRunID.Set(V.Global.iBIRUNID)
+
+'Stop logging and print report
+F.Global.BI.StopLogging(V.Global.BILOGID)
+F.Global.BI.RunReportPreProcessor(V.Global.iBIRUNID, V.Global.BILOGID, "BIRUNID", V.Local.sBIRunID, "GCG_6979_EMPL_EVAL", 16, 1, "", 1, "", -1, "", "", V.Local.iRet)
+
+'Clear BI data
+F.Intrinsic.String.Build("delete from GCG_6979_BI_REPORTS where BI_RUN_ID = '{0}'", V.Global.iBIRUNID, V.Local.sSql)
+F.ODBC.Connection!con.Execute(V.Local.sSql)
+
+'Close datatables and connection
+F.Data.DataView.Close("dtAll", "dvFiltered")
+F.Data.Datatable.Close("dtFiltered")
+F.ODBC.Connection!con.Close
+F.Intrinsic.Control.ExitSub
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.Control.CallSub(ErrorMessage, "ErrorNumber", V.Ambient.ErrorNumber, "ErrorDescription", V.Ambient.ErrorDescription, "Subroutine", V.Ambient.CurrentSubroutine)
+F.Intrinsic.Control.EndTry
+Program.Sub.PrintToCrystal.End
+
+Program.Sub.Serialize.Start
+F.Intrinsic.Control.Try
+
+V.Local.sSerialize.Declare(String)
+
+GUI.EmpEval.GSGC_EmpEval.Serialize("gvAll",V.Local.sSerialize)
+
+F.Global.Registry.AddValue(V.Caller.User,V.Caller.CompanyCode,"gvAll",100000,6979,False,"Serialize",False,0,0,V.Ambient.Date,V.Ambient.Time,V.Local.sSerialize)
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.Control.CallSub(ErrorMessage, "ErrorNumber", V.Ambient.ErrorNumber, "ErrorDescription", V.Ambient.ErrorDescription, "Subroutine", V.Ambient.CurrentSubroutine)
+F.Intrinsic.Control.EndTry
+Program.Sub.Serialize.End
+
+Program.Sub.Deserialize.Start
+F.Intrinsic.Control.Try
+
+V.Local.sSerialize.Declare(String)
+
+F.Global.Registry.ReadValue(V.Caller.User,V.Caller.CompanyCode,"gvAll",100000,6979,6,"",V.Local.sSerialize)
+F.Intrinsic.Control.If(V.Local.sSerialize.Trim,<>,"")
+	GUI.EmpEval.GSGC_EmpEval.Deserialize(V.Local.sSerialize)
+	
+F.Intrinsic.Control.EndIf
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.Control.CallSub(ErrorMessage, "ErrorNumber", V.Ambient.ErrorNumber, "ErrorDescription", V.Ambient.ErrorDescription, "Subroutine", V.Ambient.CurrentSubroutine)
+F.Intrinsic.Control.EndTry
+Program.Sub.Deserialize.End
+
+Program.Sub.ddlStatus_Change.Start
+F.Intrinsic.Control.Try
+
+F.Intrinsic.Control.CallSub(Serialize)
+F.Intrinsic.Control.CallSub(FormatData)
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.Control.CallSub(ErrorMessage, "ErrorNumber", V.Ambient.ErrorNumber, "ErrorDescription", V.Ambient.ErrorDescription, "Subroutine", V.Ambient.CurrentSubroutine)
+F.Intrinsic.Control.EndTry
+Program.Sub.ddlStatus_Change.End
+
+Program.Sub.EmpEval_UnLoad.Start
+F.Intrinsic.Control.Try
+
+F.Intrinsic.Control.CallSub(Serialize)
+F.Intrinsic.Control.If(V.ODBC.con.Exists)
+	F.ODBC.Connection!con.Close
+F.Intrinsic.Control.EndIf
+F.Intrinsic.Control.End
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.Control.CallSub(ErrorMessage, "ErrorNumber", V.Ambient.ErrorNumber, "ErrorDescription", V.Ambient.ErrorDescription, "Subroutine", V.Ambient.CurrentSubroutine)
+F.Intrinsic.Control.EndTry
+Program.Sub.EmpEval_UnLoad.End
+
+Program.Sub.ErrorMessage.Start
+F.Intrinsic.Control.Try
+
+V.Local.iError.Declare(Long)
+V.Local.sErrorDescription.Declare(String)
+V.Local.sSubroutine.Declare(String)
+V.Local.sError.Declare(String)
+V.Local.bExists.Declare(Boolean)
+V.Local.sCallback.Declare(String)
+V.Static.bError.Declare(Boolean, False)
+
+V.Local.iError.Set(V.Args.ErrorNumber)
+V.Local.sErrorDescription.Set(V.Args.ErrorDescription)
+V.Local.sSubroutine.Set(V.Args.Subroutine)
+
+'make sure we aren't in an error loop
+F.Intrinsic.Control.If(V.Static.bError)
+	F.Intrinsic.Control.End
+F.Intrinsic.Control.EndIf
+V.Static.bError.Set(True)
+
+F.Intrinsic.String.Build("Project: {0}{1}{1}Subroutine: {2}{1}Error Occurred {3} with description {4}{1}{1}GAB Version: {5}", V.Caller.ScriptFile, V.Ambient.Newline, V.Local.sSubroutine, V.Local.iError, V.Local.sErrorDescription, V.Ambient.GABVersion, V.Local.sError)
+F.Intrinsic.UI.Msgbox(V.Local.sError)
+	
+F.Intrinsic.Control.End
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.Control.CallSub(ErrorMessage, "ErrorNumber", V.Ambient.ErrorNumber, "ErrorDescription", V.Ambient.ErrorDescription, "Subroutine", V.Ambient.CurrentSubroutine)
+F.Intrinsic.Control.EndTry
+Program.Sub.ErrorMessage.End
+
+Program.Sub.Comments.Start
+${$5$}$20.1.8328.25015$}$1
+${$6$}$atudon$}$20221208163520616$}$wHlNQNSPD/BybNtaCJPwGHNwUyiDpx8wTI1WNnSZfY2Jx4JzvtJkYLEfmgi9p6kfhdFj4laufiw=
+Program.Sub.Comments.End
+
