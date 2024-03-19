@@ -1,0 +1,396 @@
+﻿Program.Sub.Preflight.Start
+V.Global.sMonthOrder.Declare(String)
+Program.Sub.Preflight.End
+
+Program.Sub.Main.Start
+'Developer: Angel Tudon
+'Customer: NEP Electronics Inc
+'Ticket: https://www.gss-service.com/Calls/CallEditInternalOpen/1341807
+'Quote: 13821 - 0
+'This project will run on an overnight scheduled task to cache all data needed for the dashboard portion of this project.
+F.Intrinsic.Control.Try
+
+F.ODBC.Connection!con.OpenCompanyConnection(400)
+F.Intrinsic.Control.CallSub(CacheData)
+F.Intrinsic.Control.CallSub(CacheEfficiencies)
+
+'Log current date/time after successful cache
+V.Local.sSql.Declare(String)
+V.Local.sDate.Declare(Date)
+F.Intrinsic.String.Build("Insert into GCG_6979_LOG values ('{0}', '1', 'NONE', '{1}')", V.Ambient.Now.PervasiveDate, V.Ambient.Time, V.Local.sSql)
+F.ODBC.Connection!con.Execute(V.Local.sSql)
+'Delete any logs records older than 20 days.
+F.Intrinsic.Date.DateSubtractWorkdays(V.Ambient.Now, 20, V.Local.sDate)
+F.Intrinsic.String.Build("Delete from GCG_6979_LOG where CACHE_DATE < '{0}'", V.Local.sDate.PervasiveDate, V.Local.sSql)
+F.ODBC.Connection!con.Execute(V.Local.sSql)
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.Control.CallSub(ErrorMessage, "ErrorNumber", V.Ambient.ErrorNumber, "ErrorDescription", V.Ambient.ErrorDescription, "Subroutine", V.Ambient.CurrentSubroutine)
+F.Intrinsic.Control.EndTry
+Program.Sub.Main.End
+
+Program.Sub.CacheData.Start
+F.Intrinsic.Control.Try
+
+V.Local.iCount.Declare(Long)
+V.Local.sYear.Declare(String)
+V.Local.sDetailCondition.Declare(String)
+V.Local.sOperationsCondition.Declare(String)
+V.Local.sPartCondition.Declare(String)
+V.Local.sSql.Declare(String)
+
+'Clear currently cached data
+F.ODBC.Connection!con.Execute("Delete from GCG_6979_EMPL_EVAL")
+'Get current year
+F.Intrinsic.Date.Year(V.Ambient.Now, V.Local.sYear)
+F.Intrinsic.Math.Sub(V.Local.sYear, 2, V.Local.sYear)
+
+'Loop to cache data for last 3 years starting from current
+F.Intrinsic.Control.For(V.Local.iCount, 1, 3, 1)
+
+	'Build sql conditions for querying JOB_DETAIL and JOB_OPERATIONS (including hist tables)
+	F.Intrinsic.String.Build("and CHARGE_DATE >= '{0}-01-01' and CHARGE_DATE <= '{0}-12-31'", V.Local.sYear, V.Local.sDetailCondition)
+	F.Intrinsic.Control.If(V.Local.iCount, =, 3)
+		F.Intrinsic.String.Build("and DATE_DUE >= '{0}-01-01'", V.Local.sYear, V.Local.sOperationsCondition)
+		F.Intrinsic.String.Build("DATE_CLOSED >= '{0}-01-01'", V.Local.sYear, V.Local.sPartCondition)
+		
+	F.Intrinsic.Control.Else
+		F.Intrinsic.String.Build("and DATE_DUE >= '{0}-01-01' and DATE_DUE <= '{0}-12-31'", V.Local.sYear, V.Local.sOperationsCondition)
+		F.Intrinsic.String.Build("DATE_CLOSED >= '{0}-01-01' and DATE_CLOSED <= '{0}-12-31'", V.Local.sYear, V.Local.sPartCondition)
+		
+	F.Intrinsic.Control.EndIf
+		
+	'Query main data off JOB_DETAIL
+	F.Intrinsic.String.Build("SELECT JOB, SUFFIX, SEQ, (RTRIM(JOB)+RTRIM(SUFFIX)) JOB_KEY, (RTRIM(JOB)+RTRIM(SUFFIX)+RTRIM(SEQ)) SEQ_KEY, DATE_SEQUENCE, EMPLOYEE, DEPT_WORKCENTER, HOURS_WORKED, LTRIM(LMO) LMO, START_MIN, END_MIN, LUNCH_TAKEN, IF(LUNCH_TAKEN = 'Y', 30, 0) LUNCH_TIME, BRK1_TAKEN, BRK2_TAKEN, BRK3_TAKEN, (END_MIN - START_MIN) - (IF(BRK1_TAKEN = 'Y', 10, 0)) - (IF(LUNCH_TAKEN = 'Y', 30, 0)) - (IF(BRK2_TAKEN = 'Y', 10, 0)) MIN_MINUS_BREAKS, START_TIME, END_TIME, CHARGE_DATE, EMPL, DEPT_EMP, MULTIPLE_FRACTION, PIECES_COMPLTD, IF(DEPT_EMP = '2ND', '2ND', '1ST') SHIFT, IF(MULTIPLE_FRACTION = 0, (END_MIN - START_MIN) - (IF(BRK1_TAKEN = 'Y', 10, 0)) - (IF(LUNCH_TAKEN = 'Y', 30, 0)) - (IF(BRK2_TAKEN = 'Y', 10, 0)), ((END_MIN - START_MIN) - (IF(BRK1_TAKEN = 'Y', 10, 0)) - (IF(LUNCH_TAKEN = 'Y', 30, 0)) - (IF(BRK2_TAKEN = 'Y', 10, 0)) * MULTIPLE_FRACTION)) MINUTES FROM V_JOB_DETAIL WHERE left(Job,1) Not in ('M','Z') and LMO like '%L%' AND (EMPLOYEE Not Like 'TASK%') AND (LBR_BATCH_NO Like 'L%') {0}", V.Local.sDetailCondition, V.Local.sSql)
+	F.Data.Datatable.CreateFromSQL("dtMain", "con", V.Local.sSql, True)
+	
+	'Query data off JOB_HIST_DTL
+	F.Intrinsic.String.Build("SELECT JOB, SUFFIX, SEQ, (RTRIM(JOB)+RTRIM(SUFFIX)) JOB_KEY, (RTRIM(JOB)+RTRIM(SUFFIX)+RTRIM(SEQ)) SEQ_KEY, DATE_SEQUENCE, EMPLOYEE_NAME EMPLOYEE, DEPARTMENT DEPT_WORKCENTER, HOURS_WORKED, LTRIM(LMO) LMO, START_MIN, END_MIN, LUNCH_TAKEN, IF(LUNCH_TAKEN = 'Y', 30, 0) LUNCH_TIME, BRK1_TAKEN, BRK2_TAKEN, BRK3_TAKEN, (END_MIN - START_MIN) - (IF(BRK1_TAKEN = 'Y', 10, 0)) - (IF(LUNCH_TAKEN = 'Y', 30, 0)) - (IF(BRK2_TAKEN = 'Y', 10, 0)) MIN_MINUS_BREAKS, START_TIME, END_TIME, CHARGE_DATE, EMPLOYEE EMPL, DEPT_EMPLOYEE DEPT_EMP, MULTIPLE_FRACTION, PIECES_COMPLTD, IF(DEPT_EMPLOYEE = '2ND', '2ND', '1ST') SHIFT, IF(MULTIPLE_FRACTION = 0, (END_MIN - START_MIN) - (IF(BRK1_TAKEN = 'Y', 10, 0)) - (IF(LUNCH_TAKEN = 'Y', 30, 0)) - (IF(BRK2_TAKEN = 'Y', 10, 0)), ((END_MIN - START_MIN) - (IF(BRK1_TAKEN = 'Y', 10, 0)) - (IF(LUNCH_TAKEN = 'Y', 30, 0)) - (IF(BRK2_TAKEN = 'Y', 10, 0)) * MULTIPLE_FRACTION)) MINUTES FROM V_JOB_HIST_DTL WHERE left(Job,1) Not in ('M','Z') and LMO like '%L%' AND (EMPLOYEE Not Like 'TASK%') AND (LBR_BATCH_NO Like 'L%') {0}", V.Local.sDetailCondition, V.Local.sSql)
+	F.Data.Datatable.CreateFromSQL("dtHist", "con", V.Local.sSql, True)
+	
+	'Calculate seconds per piece (will have to add same expression columns to both main and hist  data tables as merging and then saving to DB is not working)
+	F.Data.Datatable.AddExpressionColumn("dtMain", "SEC_PC", "Float", "IIF(PIECES_COMPLTD <> 0, (([MINUTES]*60)/PIECES_COMPLTD), 0)")
+	F.Data.Datatable.AddExpressionColumn("dtHist", "SEC_PC", "Float", "IIF(PIECES_COMPLTD <> 0, (([MINUTES]*60)/PIECES_COMPLTD), 0)")
+	
+	'Get needed data from JOB_OPERATIONS from both current and hist
+	F.Intrinsic.String.Build("SELECT JOB, SUFFIX, SEQ, (RTRIM(JOB)+RTRIM(SUFFIX)) JOB_KEY, (RTRIM(JOB)+RTRIM(SUFFIX)+RTRIM(SEQ)) SEQ_KEY, OPERATION, LMO, DESCRIPTION, PART, ROUTER, ROUTER_SEQ, SETUP, HOURS_ESTIMATED, HOURS_ACTUAL, DATE_COMPLETED, DATE_DUE, UNITS_COMPLETE, (HOURS_ESTIMATED*3600) SECONDS_ESTIMATED, IF(CAST(UNITS_COMPLETE as int) = 0, 0.0000, (HOURS_ESTIMATED*3600)/(UNITS_COMPLETE)) SEC_PC_EST FROM V_JOB_OPERATIONS WHERE LMO like '%L%' {0}", V.Local.sOperationsCondition, V.Local.sSql)
+	F.Data.Datatable.CreateFromSQL("dtOps", "con", V.Local.sSql, True)
+	
+	F.Intrinsic.String.Build("SELECT JOB, SUFFIX, SEQ, (RTRIM(JOB)+RTRIM(SUFFIX)) JOB_KEY, (RTRIM(JOB)+RTRIM(SUFFIX)+RTRIM(SEQ)) SEQ_KEY, OPERATION, LMO, DESCRIPTION, PART, ROUTER, ROUTER_SEQ, SETUP, HOURS_ESTIMATED, HOURS_ACTUAL, DATE_COMPLETED, DATE_DUE, UNITS_COMPLETE, (HOURS_ESTIMATED*3600) SECONDS_ESTIMATED, IF(CAST(UNITS_COMPLETE as int) = 0, 0.0000, (HOURS_ESTIMATED*3600)/(UNITS_COMPLETE)) SEC_PC_EST FROM V_JOB_HIST_OPS WHERE LMO like '%L%' {0}", V.Local.sOperationsCondition, V.Local.sSql)
+	F.Data.Datatable.CreateFromSQL("dtOpsHist", "con", V.Local.sSql, True)
+	
+	'Create dictionary to capture seconds per piece estimated and fill on dtMain
+	F.Data.Dictionary.CreateFromDataTable("dictSecPerPcEst", "dtOps", "SEQ_KEY", "SEC_PC_EST")
+	F.Data.Dictionary.SetDefaultReturn("dictSecPerPcEst", 0)
+	F.Data.Dictionary.CreateFromDataTable("dictSecPerPcEstHist", "dtOpsHist", "SEQ_KEY", "SEC_PC_EST")
+	F.Data.Dictionary.SetDefaultReturn("dictSecPerPcEstHist", 0)
+	F.Data.Datatable.AddColumn("dtMain", "SEC_PC_EST", "Float")
+	F.Data.Datatable.FillFromDictionary("dtMain", "dictSecPerPcEst", "SEQ_KEY", "SEC_PC_EST")
+	F.Data.Datatable.AddColumn("dtHist", "SEC_PC_EST", "Float")
+	F.Data.Datatable.FillFromDictionary("dtHist", "dictSecPerPcEstHist", "SEQ_KEY", "SEC_PC_EST")
+	'Create dictionary to capture job parts and fill on dtMain
+	F.Intrinsic.String.Build("SELECT (JOB + SUFFIX) JOB_KEY, PART FROM V_JOB_HEADER V_JOB_HEADER WHERE ({0}) OR  (DATE_CLOSED='1900-01-01')", V.Local.sPartCondition, V.Local.sSql)
+	F.Data.Dictionary.CreateFromSql("dictParts", "con", V.Local.sSql)
+	F.Data.Dictionary.SetDefaultReturn("dictParts", "")
+	F.Intrinsic.String.Build("SELECT (JOB + SUFFIX) JOB_KEY, PART FROM V_JOB_HIST_MAST V_JOB_HEADER WHERE ({0}) OR  (DATE_CLOSED='1900-01-01')", V.Local.sPartCondition, V.Local.sSql)
+	F.Data.Dictionary.CreateFromSql("dictPartsHist", "con", V.Local.sSql)
+	F.Data.Dictionary.SetDefaultReturn("dictPartsHist", "")
+	F.Data.Datatable.AddColumn("dtMain", "PART", "String")
+	F.Data.Datatable.FillFromDictionary("dtMain", "dictParts", "JOB_KEY", "PART")
+	F.Data.Datatable.AddColumn("dtHist", "PART", "String")
+	F.Data.Datatable.FillFromDictionary("dtHist", "dictPartsHist", "JOB_KEY", "PART")
+	'Create dictionary to capture employees active status
+	F.Data.Dictionary.CreateFromSQL("dictNames", "con", "select EMPLOYEE, IF(DATE_TERMINATION <> '1900-01-01', 'N', 'Y'), DATE_TERMINATION from V_EMPLOYEE_MSTR")
+	F.Data.Dictionary.SetDefaultReturn("dictNames", "N")
+	F.Data.Datatable.AddColumn("dtMain", "ACTIVE", "String")
+	F.Data.Datatable.FillFromDictionary("dtMain", "dictNames", "EMPL", "ACTIVE")
+	F.Data.Datatable.AddColumn("dtHist", "ACTIVE", "String")
+	F.Data.Datatable.FillFromDictionary("dtHist", "dictNames", "EMPL", "ACTIVE")
+	
+	'Add expression columns to calculate all needed metrics per record
+	F.Data.Datatable.AddExpressionColumn("dtMain", "ACT_HRS", "Float", "([PIECES_COMPLTD] * [SEC_PC]) / 3600")
+	F.Data.Datatable.AddExpressionColumn("dtMain", "EST_HRS", "Float", "([PIECES_COMPLTD] * [SEC_PC_EST]) / 3600")
+	F.Data.Datatable.AddExpressionColumn("dtMain", "DIFF_HRS", "Float", "[EST_HRS] - [ACT_HRS]")
+	F.Data.Datatable.AddExpressionColumn("dtMain", "EFFICIENCY", "Float", "IIF([EST_HRS] = 0 OR [ACT_HRS] = 0, 0, ([EST_HRS] / [ACT_HRS]))")
+	F.Data.Datatable.AddExpressionColumn("dtHist", "ACT_HRS", "Float", "([PIECES_COMPLTD] * [SEC_PC]) / 3600")
+	F.Data.Datatable.AddExpressionColumn("dtHist", "EST_HRS", "Float", "([PIECES_COMPLTD] * [SEC_PC_EST]) / 3600")
+	F.Data.Datatable.AddExpressionColumn("dtHist", "DIFF_HRS", "Float", "[EST_HRS] - [ACT_HRS]")
+	F.Data.Datatable.AddExpressionColumn("dtHist", "EFFICIENCY", "Float", "IIF([EST_HRS] = 0 OR [ACT_HRS] = 0, 0, ([EST_HRS] / [ACT_HRS]))")
+	'Save data to db from both main and hist datatables
+	F.Data.Datatable.SaveToDB("dtMain", "con", "GCG_6979_EMPL_EVAL", True, 128)
+	F.Data.Datatable.SaveToDB("dtHist", "con", "GCG_6979_EMPL_EVAL", True, 128)
+	
+	'Close all datatable and dictionaries for next loop
+	F.Data.Datatable.Close("dtMain")
+	F.Data.Datatable.Close("dtHist")
+	F.Data.Datatable.Close("dtOpsHist")
+	F.Data.Datatable.Close("dtOps")
+	F.Data.Dictionary.Close("dictSecPerPcEst")
+	F.Data.Dictionary.Close("dictSecPerPcEstHist")
+	F.Data.Dictionary.Close("dictParts")
+	F.Data.Dictionary.Close("dictPartsHist")
+	F.Data.Dictionary.Close("dictNames")
+
+	'Add one to year count
+	F.Intrinsic.Math.Add(V.Local.sYear, 1, V.Local.sYear)
+	
+F.Intrinsic.Control.Next(V.Local.iCount)
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.Control.CallSub(ErrorMessage, "ErrorNumber", V.Ambient.ErrorNumber, "ErrorDescription", V.Ambient.ErrorDescription, "Subroutine", V.Ambient.CurrentSubroutine)
+F.Intrinsic.Control.EndTry
+Program.Sub.CacheData.End
+
+Program.Sub.CacheEfficiencies.Start
+F.Intrinsic.Control.Try
+
+V.Local.sMonth.Declare(String)
+V.Local.sYear.Declare(String)
+V.Local.iCount.Declare(Long)
+V.Local.sRet.Declare(Long)
+V.Local.sColumn.Declare(String)
+V.Local.sEstColumn.Declare(String)
+V.Local.sActColumn.Declare(String)
+V.Local.sExpression.Declare(String)
+V.Local.sStatus.Declare(String)
+V.Local.sCondition.Declare(String)
+V.Local.sSql.Declare(String)
+
+'Clear month order list for subsequent loads
+V.Global.sMonthOrder.Set("")
+
+'Create Dictionaries to capture montly estimate totals
+F.Intrinsic.Control.If(V.DataTable.dtTotals.Exists, =, False)
+	F.Data.Datatable.CreateFromSQL("dtTotals", "con", "select RTRIM(EMPL) + CONCAT(month(DATE_SEQUENCE), year(DATE_SEQUENCE)) as DICT_KEY, SUM(ACT_HRS) ACT_HRS, SUM(EST_HRS) EST_HRS from GCG_6979_EMPL_EVAL where EMPL not like '#%' group by DICT_KEY")
+	F.Data.Dictionary.CreateFromDatatable("dictActual", "dtTotals", "DICT_KEY", "ACT_HRS")
+	F.Data.Dictionary.SetDefaultReturn("dictActual", 0.00)
+	F.Data.Dictionary.CreateFromDatatable("dictEstimated", "dtTotals", "DICT_KEY", "EST_HRS")
+	F.Data.Dictionary.SetDefaultReturn("dictEstimated", 0.00)
+	
+	
+F.Intrinsic.Control.EndIf
+
+'Ensure dt does not exist and close if so
+F.Intrinsic.Control.If(V.DataTable.dtAll.Exists)
+	F.Data.Datatable.Close("dtAll")
+F.Intrinsic.Control.EndIf
+
+'Create initial datatable with 
+F.Data.Datatable.CreateFromSQL("dtAll", "con", "select distinct RTRIM(EMPL) EMPL, RTRIM(EMPLOYEE) EMPLOYEE, ACTIVE from GCG_6979_EMPL_EVAL where EMPL < '98999' and EMPL not like '#%' and EMPLOYEE not like '*%'", True)
+
+'Get current month and year
+F.Intrinsic.Date.Month(V.Ambient.Now, V.Local.sMonth)
+F.Intrinsic.Date.Year(V.Ambient.Now, V.Local.sYear)
+
+'Loop to create column names in the correct order starting with current date back 12 months
+F.Intrinsic.Control.For(V.Local.iCount, 1, 12, 1)
+	F.Intrinsic.String.Build("{0}{1}", V.Local.sMonth, V.Local.sYear, V.Local.sRet)
+	F.Intrinsic.Control.CallSub(NameMonthColumns, "Month", V.Local.sMonth)
+	F.Data.Datatable.AddColumn("dtAll", V.Args.Month, "String")
+	F.Data.Datatable.SetValue("dtAll", -1, V.Args.Month, V.Local.sRet)
+	
+	F.Intrinsic.String.Build("{0}_KEY", V.Args.Month, V.Local.sColumn)
+	F.Intrinsic.String.Build("[EMPL] + [{0}]", V.Args.Month, V.Local.sExpression)
+	F.Data.Datatable.AddExpressionColumn("dtAll", V.Local.sColumn, "String", V.Local.sExpression)
+	
+	'Subtract month by 1. If current month is 1 (Jan) loop back to month 12 (Dec) and decrease year by 1
+	F.Intrinsic.Control.If(V.Local.sMonth, =, 1)
+		V.Local.sMonth.Set(12)
+		F.Intrinsic.Math.Sub(V.Local.sYear, 1, V.Local.sYear)
+	F.Intrinsic.Control.Else
+		F.Intrinsic.Math.Sub(V.Local.sMonth, 1, V.Local.sMonth)
+	F.Intrinsic.Control.EndIf
+	
+	'Create month order depending on current month
+	F.Intrinsic.Control.If(V.Global.sMonthOrder, =, "")
+		V.Global.sMonthOrder.Set(V.Local.sColumn)
+	F.Intrinsic.Control.Else
+		F.Intrinsic.String.Build("{0}*!*{1}", V.Global.sMonthOrder, V.Local.sColumn, V.Global.sMonthOrder)
+	F.Intrinsic.Control.EndIf
+		
+F.Intrinsic.Control.Next(V.Local.iCount)
+
+'Loop through month list to gather estimated and actual totals for each month
+F.Intrinsic.String.Split(V.Global.sMonthOrder, "*!*", V.Global.sMonthOrder)
+F.Intrinsic.Control.For(V.Local.iCount, 0, V.Global.sMonthOrder.UBound, 1)
+
+	'Add Estimated Hrs totals
+	F.Intrinsic.String.Left(V.Global.sMonthOrder(V.Local.iCount), 3, V.Local.sColumn)
+	F.Intrinsic.String.Build("{0}_EST", V.Local.sColumn, V.Local.sEstColumn)
+	F.Data.Datatable.AddColumn("dtAll", V.Local.sEstColumn, "Float")
+	F.Data.Datatable.FillFromDictionary("dtAll", "dictEstimated", V.Global.sMonthOrder(V.Local.iCount), V.Local.sEstColumn)
+	
+	'Add Actual Hrs totals
+	F.Intrinsic.String.Left(V.Global.sMonthOrder(V.Local.iCount), 3, V.Local.sColumn)
+	F.Intrinsic.String.Build("{0}_ACT", V.Local.sColumn, V.Local.sActColumn)
+	F.Data.Datatable.AddColumn("dtAll", V.Local.sActColumn, "Float")
+	F.Data.Datatable.FillFromDictionary("dtAll", "dictActual", V.Global.sMonthOrder(V.Local.iCount), V.Local.sActColumn)
+	
+	'Add Difference totals
+	F.Intrinsic.String.Left(V.Global.sMonthOrder(V.Local.iCount), 3, V.Local.sColumn)
+	F.Intrinsic.String.Build("{0}_DIFF", V.Local.sColumn, V.Local.sColumn)
+	F.Intrinsic.String.Build("[{0}] - [{1}]", V.Local.sEstColumn, V.Local.sActColumn, V.Local.sExpression)
+	F.Data.Datatable.AddExpressionColumn("dtAll", V.Local.sColumn, "Float", V.Local.sExpression)
+	
+	'Add Efficiency totals
+	F.Intrinsic.String.Left(V.Global.sMonthOrder(V.Local.iCount), 3, V.Local.sColumn)
+	F.Intrinsic.String.Build("MONTH_{0}", V.Local.iCount, V.Local.sColumn)
+	F.Intrinsic.String.Build("IIF([{0}] = 0 OR [{1}] = 0, 0, [{0}] / [{1}])", V.Local.sEstColumn, V.Local.sActColumn, V.Local.sExpression)
+	F.Data.Datatable.AddExpressionColumn("dtAll", V.Local.sColumn, "Float", V.Local.sExpression)
+
+F.Intrinsic.Control.Next(V.Local.iCount)
+
+'Create columns to capture last 3 years efficiencies
+F.Data.Datatable.AddColumn("dtAll", "YEAR_0", "Float")
+F.Data.Datatable.AddColumn("dtAll", "YEAR_1", "Float")
+F.Data.Datatable.AddColumn("dtAll", "YEAR_2", "Float")
+
+'Create table to store last 3 years efficiency
+F.Data.Datatable.CreateFromSQL("dtLast3Years", "con", "Select EMPL, '' YEAR_0, '' YEAR_1, '' YEAR_2 from GCG_6979_EMPL_EVAL where EMPL not like '#%' and EMPL < '98999'", True)
+
+'Get current year and loop to get get last 3 year's efficiencies
+F.Intrinsic.Date.Year(V.Ambient.Now, V.Local.sYear)
+F.Intrinsic.Control.For(V.Local.iCount, 0, 2, 1)
+	
+	'Capture all totals actual hrs and estimated hrs totals for the year
+	F.Intrinsic.String.Build("Select RTRIM(EMPL) EMPL, year(DATE_SEQUENCE) YEAR_DATE, sum(EST_HRS) EST_HRS, sum(ACT_HRS) ACT_HRS from GCG_6979_EMPL_EVAL where YEAR_DATE = '{0}' and EMPL not like '#%' and EMPL < '98999'group by EMPL, YEAR_DATE", V.Local.sYear, V.Local.sSql)
+	F.Data.Datatable.CreateFromSQL("dtYearTotals", "con", V.Local.sSql)
+	'Add column to calculate year efficiency (estimated hrs / actual hrs)
+	F.Data.Datatable.AddExpressionColumn("dtYearTotals", "EFFICIENCY", "Float", "IIF([ACT_HRS] = 0, 0, [EST_HRS]/[ACT_HRS])")
+	'Creat dictionary and fill current year efficiency to main table
+	F.Data.Dictionary.CreateFromDatatable("dictYear", "dtYearTotals", "EMPL", "EFFICIENCY")
+	F.Data.Dictionary.SetDefaultReturn("dictYear", 0.00)
+	F.Intrinsic.String.Build("YEAR_{0}", V.Local.iCount, V.Local.sColumn)
+	F.Data.Datatable.FillFromDictionary("dtAll", "dictYear", "EMPL", V.Local.sColumn)
+	'Close table/dict for next loop
+	F.Data.Datatable.Close("dtYearTotals")
+	F.Data.Dictionary.Close("dictYear")
+	
+	'Decrease year by one
+	F.Intrinsic.Math.Sub(V.Local.sYear, 1, V.Local.sYear)
+
+F.Intrinsic.Control.Next(V.Local.iCount)
+
+'Clear current totals from table
+F.ODBC.Connection!con.Execute("delete from GCG_6979_TOTALS")
+'Save new cached totals to table.
+F.Data.Datatable.SaveToDB("dtAll", "con", "GCG_6979_TOTALS", "EMPL", 128, "EMPL@!@EMPL*!*MONTH_0@!@MONTH_0*!*MONTH_1@!@MONTH_1*!*MONTH_2@!@MONTH_2*!*MONTH_3@!@MONTH_3*!*MONTH_4@!@MONTH_4*!*MONTH_5@!@MONTH_5*!*MONTH_6@!@MONTH_6*!*MONTH_7@!@MONTH_7*!*MONTH_8@!@MONTH_8*!*MONTH_9@!@MONTH_9*!*MONTH_10@!@MONTH_10*!*MONTH_11@!@MONTH_11*!*YEAR_0@!@YEAR_0*!*YEAR_1@!@YEAR_1*!*YEAR_2@!@YEAR_2")
+
+'Close dictionaries
+F.Data.Dictionary.Close("dictActual")
+F.Data.Dictionary.Close("dictEstimated")
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.Control.CallSub(ErrorMessage, "ErrorNumber", V.Ambient.ErrorNumber, "ErrorDescription", V.Ambient.ErrorDescription, "Subroutine", V.Ambient.CurrentSubroutine)
+F.Intrinsic.Control.EndTry
+Program.Sub.CacheEfficiencies.End
+
+Program.Sub.NameMonthColumns.Start
+F.Intrinsic.Control.Try
+
+V.Local.sMonth.Declare(String)
+
+'Set month name corresponding to month number
+F.Intrinsic.Control.SelectCase(V.Args.Month)
+	F.Intrinsic.Control.Case("1")
+		V.Local.sMonth.Set("JAN")
+		F.Intrinsic.Variable.AddRV("Month", V.Local.sMonth)
+	F.Intrinsic.Control.Case("2")
+		V.Local.sMonth.Set("FEB")
+		F.Intrinsic.Variable.AddRV("Month", V.Local.sMonth)
+	F.Intrinsic.Control.Case("3")
+		V.Local.sMonth.Set("MAR")
+		F.Intrinsic.Variable.AddRV("Month", V.Local.sMonth)
+	F.Intrinsic.Control.Case("4")
+		V.Local.sMonth.Set("APR")
+		F.Intrinsic.Variable.AddRV("Month", V.Local.sMonth)
+	F.Intrinsic.Control.Case("5")
+		V.Local.sMonth.Set("MAY")
+		F.Intrinsic.Variable.AddRV("Month", V.Local.sMonth)
+	F.Intrinsic.Control.Case("6")
+		V.Local.sMonth.Set("JUN")
+		F.Intrinsic.Variable.AddRV("Month", V.Local.sMonth)
+	F.Intrinsic.Control.Case("7")
+		V.Local.sMonth.Set("JUL")
+		F.Intrinsic.Variable.AddRV("Month", V.Local.sMonth)
+	F.Intrinsic.Control.Case("8")
+		V.Local.sMonth.Set("AUG")
+		F.Intrinsic.Variable.AddRV("Month", V.Local.sMonth)
+	F.Intrinsic.Control.Case("9")
+		V.Local.sMonth.Set("SEP")
+		F.Intrinsic.Variable.AddRV("Month", V.Local.sMonth)
+	F.Intrinsic.Control.Case("10")
+		V.Local.sMonth.Set("OCT")
+		F.Intrinsic.Variable.AddRV("Month", V.Local.sMonth)
+	F.Intrinsic.Control.Case("11")
+		V.Local.sMonth.Set("NOV")
+		F.Intrinsic.Variable.AddRV("Month", V.Local.sMonth)
+	F.Intrinsic.Control.Case("12")
+		V.Local.sMonth.Set("DEC")
+		F.Intrinsic.Variable.AddRV("Month", V.Local.sMonth)
+		
+F.Intrinsic.Control.EndSelect
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.Control.CallSub(ErrorMessage, "ErrorNumber", V.Ambient.ErrorNumber, "ErrorDescription", V.Ambient.ErrorDescription, "Subroutine", V.Ambient.CurrentSubroutine)
+F.Intrinsic.Control.EndTry
+Program.Sub.NameMonthColumns.End
+
+Program.Sub.Unload.Start
+F.Intrinsic.Control.Try
+
+F.Intrinsic.Contorl.If(V.DataTable.con.Exists)
+	F.ODBC.Connection!con.Close
+F.Intrinsic.Control.EndIf
+
+F.Intrinsic.Control.End
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.Control.CallSub(ErrorMessage, "ErrorNumber", V.Ambient.ErrorNumber, "ErrorDescription", V.Ambient.ErrorDescription, "Subroutine", V.Ambient.CurrentSubroutine)
+F.Intrinsic.Control.EndTry
+Program.Sub.Unload.End
+
+Program.Sub.ErrorMessage.Start
+F.Intrinsic.Control.Try
+
+V.Local.iError.Declare(Long)
+V.Local.sErrorDescription.Declare(String)
+V.Local.sSubroutine.Declare(String)
+V.Local.sError.Declare(String)
+V.Local.bExists.Declare(Boolean)
+V.Local.sCallback.Declare(String)
+V.Static.bError.Declare(Boolean, False)
+V.Local.sSql.Declare(String)
+
+V.Local.iError.Set(V.Args.ErrorNumber)
+V.Local.sErrorDescription.Set(V.Args.ErrorDescription)
+V.Local.sSubroutine.Set(V.Args.Subroutine)
+
+'make sure we aren't in an error loop
+F.Intrinsic.Control.If(V.Static.bError)
+	F.Intrinsic.Control.End
+F.Intrinsic.Control.EndIf
+V.Static.bError.Set(True)
+
+'Build error string
+F.Intrinsic.String.Build("Subroutine: {0} {1}-Error Occurred: {2}", V.Local.sSubroutine, V.Local.iError, V.Local.sErrorDescription, V.Local.sError)
+'Log failed date/time with error description
+F.Intrinsic.String.Build("Insert into GCG_6979_LOG values ('{0}', '0', '{1}', '{2}')", V.Ambient.Now.PervasiveDate, V.Local.sError, V.Ambient.Time, V.Local.sSql)
+F.ODBC.Connection!con.Execute(V.Local.sSql)
+
+'Delete any logs records older than 20 days.
+F.Intrinsic.Date.DateSubtractWorkdays(V.Ambient.Now, 20, V.Local.sDate)
+F.Intrinsic.String.Build("Delete from GCG_6979_LOG where CACHE_DATE < '{0}'", V.Local.sDate.PervasiveDate, V.Local.sSql)
+F.ODBC.Connection!con.Execute(V.Local.sSql)
+
+F.Intrinsic.Control.CallSub(Unload)
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.Control.CallSub(ErrorMessage, "ErrorNumber", V.Ambient.ErrorNumber, "ErrorDescription", V.Ambient.ErrorDescription, "Subroutine", V.Ambient.CurrentSubroutine)
+F.Intrinsic.Control.EndTry
+Program.Sub.ErrorMessage.End
+
+Program.Sub.Comments.Start
+${$5$}$20.1.8328.25015$}$1
+${$6$}$atudon$}$20221208163518672$}$wHlNQNSPD/BybNtaCJPwGHNwUyiDpx8wTI1WNnSZfY2Jx4JzvtJkYKUc4uA9SRFW2548BWAOksE=
+Program.Sub.Comments.End
